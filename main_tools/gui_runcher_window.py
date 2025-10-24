@@ -6,7 +6,9 @@ from typing import Any
 
 import pystray
 from PIL import Image, ImageDraw
+from pynput import keyboard, mouse
 from pystray import MenuItem
+from screeninfo import get_monitors
 
 
 class TrayApplication:
@@ -32,6 +34,11 @@ class TrayApplication:
         self.root.title(title)
         self.root.geometry(geometry)
 
+        # ウィンドウサイズを保持（geometryから解析）
+        size_parts = geometry.split("+")[0].split("x")
+        self.window_width = int(size_parts[0]) if len(size_parts) > 0 else 320
+        self.window_height = int(size_parts[1]) if len(size_parts) > 1 else 180
+
         # トレイアイコンの初期化
         self.icon: pystray.Icon | None = None
 
@@ -40,11 +47,23 @@ class TrayApplication:
             Callable[["TrayApplication", tk.Tk], None] | None
         ) = create_widgets
 
+        # 自動非表示のタイマーID
+        self._auto_hide_timer: str | None = None
+
+        # 自動非表示機能の有効/無効フラグ
+        self._auto_hide_enabled: bool = True
+
         # ウィジェットの作成
         self._create_widgets()
 
         # イベントハンドラの設定
         self._setup_handlers()
+
+        # キーボードリスナーの初期化
+        self._setup_keyboard_listener()
+
+        # マウストラッキングの設定
+        self._setup_mouse_tracking()
 
     def _create_widgets(self) -> None:
         """ウィンドウのウィジェットを作成"""
@@ -67,20 +86,6 @@ class TrayApplication:
         """イベントハンドラを設定"""
         # ウィンドウを閉じたときの動作
         self.root.protocol("WM_DELETE_WINDOW", self.hide_to_tray)
-
-        # 右クリックメニュー
-        context_menu = Menu(self.root, tearoff=0)
-        context_menu.add_command(label="トレイへ隠す", command=self.hide_to_tray)
-        context_menu.add_separator()
-        context_menu.add_command(label="終了", command=self.quit_app)
-
-        def show_context_menu(event: tk.Event[Any]) -> None:
-            try:
-                context_menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                context_menu.grab_release()
-
-        self.root.bind("<Button-3>", show_context_menu)
 
     def _create_tray_icon(self) -> None:
         """トレイアイコンを作成"""
@@ -117,8 +122,42 @@ class TrayApplication:
         self.quit_app()
 
     def show_window(self) -> None:
-        """ウィンドウを表示"""
+        """ウィンドウを表示（マウス位置の中心に配置）"""
+        # マウスの現在位置を取得
+        mouse_controller = mouse.Controller()
+        mouse_x, mouse_y = mouse_controller.position
+
+        # マウス位置がウィンドウの中心になるように配置
+        x = mouse_x - self.window_width // 2
+        y = mouse_y - self.window_height // 2
+
+        # マウスがどのモニターにあるかを判断
+        current_monitor = None
+        try:
+            for monitor in get_monitors():
+                if (monitor.x <= mouse_x < monitor.x + monitor.width and
+                    monitor.y <= mouse_y < monitor.y + monitor.height):
+                    current_monitor = monitor
+                    break
+        except Exception:
+            pass
+
+        # モニターが見つかった場合はそのモニターの境界で制限
+        if current_monitor:
+            x = max(current_monitor.x, min(x, current_monitor.x + current_monitor.width - self.window_width))
+            y = max(current_monitor.y, min(y, current_monitor.y + current_monitor.height - self.window_height))
+        else:
+            # フォールバック: プライマリディスプレイのサイズを使用
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            x = max(0, min(x, screen_width - self.window_width))
+            y = max(0, min(y, screen_height - self.window_height))
+
+        # ジオメトリを設定してからウィンドウを表示
+        self.root.geometry(f"{self.window_width}x{self.window_height}+{x}+{y}")
         self.root.deiconify()
+        self.root.update_idletasks()
+
         self.root.lift()
         try:
             self.root.focus_force()
@@ -127,8 +166,14 @@ class TrayApplication:
         except Exception:
             pass
 
+        # マウストラッキングを開始
+        self._start_mouse_tracking()
+
     def hide_to_tray(self) -> None:
         """ウィンドウをトレイに隠す"""
+        # 自動非表示タイマーをキャンセル
+        self._cancel_auto_hide_timer()
+
         try:
             self.root.withdraw()
         except Exception:
@@ -146,7 +191,111 @@ class TrayApplication:
                 self.icon.stop()
         except Exception:
             pass
+        try:
+            if hasattr(self, "keyboard_listener") and self.keyboard_listener:
+                self.keyboard_listener.stop()
+        except Exception:
+            pass
         self.root.after(0, self.root.destroy)
+
+    def _setup_keyboard_listener(self) -> None:
+        """キーボードリスナーを設定（Pauseキーでウィンドウ表示）"""
+
+        def on_press(key):
+            try:
+                # Pauseキーが押された場合
+                if key == keyboard.Key.pause:
+                    self.root.after(0, self.show_window)
+            except Exception:
+                pass
+
+        # キーボードリスナーを開始
+        self.keyboard_listener = keyboard.Listener(on_press=on_press)
+        self.keyboard_listener.daemon = True
+        self.keyboard_listener.start()
+
+    def _setup_mouse_tracking(self) -> None:
+        """マウストラッキングの初期設定"""
+        # 特に初期設定は不要（_start_mouse_trackingで開始）
+        pass
+
+    def _start_mouse_tracking(self) -> None:
+        """マウストラッキングを開始（ウィンドウ外で3秒後に隠す）"""
+        # 既存のタイマーをキャンセル
+        self._cancel_auto_hide_timer()
+
+        # マウス位置をチェック
+        self._check_mouse_position()
+
+    def _check_mouse_position(self) -> None:
+        """マウス位置をチェックしてウィンドウの外なら3秒後に隠す"""
+        try:
+            # ウィンドウが表示されていない場合は何もしない
+            if not self.root.winfo_viewable():
+                return
+
+            # 自動非表示が無効の場合はタイマーをキャンセルするだけ
+            if not self._auto_hide_enabled:
+                self._cancel_auto_hide_timer()
+                self.root.after(100, self._check_mouse_position)
+                return
+
+            # マウスの現在位置を取得
+            mouse_controller = mouse.Controller()
+            mouse_x, mouse_y = mouse_controller.position
+
+            # ウィンドウの位置とサイズを取得
+            win_x = self.root.winfo_x()
+            win_y = self.root.winfo_y()
+            win_width = self.root.winfo_width()
+            win_height = self.root.winfo_height()
+
+            # マウスがウィンドウ内にあるかチェック
+            is_inside = (
+                win_x <= mouse_x <= win_x + win_width
+                and win_y <= mouse_y <= win_y + win_height
+            )
+
+            if is_inside:
+                # マウスがウィンドウ内にある場合、タイマーをキャンセル
+                self._cancel_auto_hide_timer()
+            else:
+                # マウスがウィンドウ外にある場合、タイマーを開始（まだ開始していない場合）
+                if self._auto_hide_timer is None:
+                    self._auto_hide_timer = self.root.after(1000, self.hide_to_tray)
+
+            # 100msごとにチェック
+            self.root.after(100, self._check_mouse_position)
+        except Exception:
+            pass
+
+    def _cancel_auto_hide_timer(self) -> None:
+        """自動非表示タイマーをキャンセル"""
+        if self._auto_hide_timer is not None:
+            try:
+                self.root.after_cancel(self._auto_hide_timer)
+            except Exception:
+                pass
+            self._auto_hide_timer = None
+
+    def disable_auto_hide(self) -> None:
+        """自動非表示機能を無効化"""
+        self._auto_hide_enabled = False
+        self._cancel_auto_hide_timer()
+
+    def enable_auto_hide(self) -> None:
+        """自動非表示機能を有効化"""
+        self._auto_hide_enabled = True
+
+    def update_window_size(self, width: int, height: int) -> None:
+        """ウィンドウサイズを更新
+
+        Args:
+            width: ウィンドウの幅
+            height: ウィンドウの高さ
+        """
+        self.window_width = width
+        self.window_height = height
 
     def _start_tray_thread(self) -> None:
         """トレイアイコンを別スレッドで起動"""

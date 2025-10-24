@@ -6,7 +6,10 @@
       "Bash(python -c:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(cmd /c \"dir /b main.dist | findstr /i .exe\")"
+      "Bash(cmd /c \"dir /b main.dist | findstr /i .exe\")",
+      "Bash(mkdir:*)",
+      "Bash(cmd /c \"if exist launcher_config.json del launcher_config.json\")",
+      "Bash(cmd /c \"if exist launcher_icons rmdir /s /q launcher_icons\")"
     ],
     "deny": [],
     "ask": []
