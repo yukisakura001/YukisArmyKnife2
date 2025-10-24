@@ -97,10 +97,10 @@ class TrayApplication:
         self.icon = pystray.Icon(
             "tray_app",
             icon=img,
-            title="Tray App",
+            title="トレイアプリ",
             menu=pystray.Menu(
-                MenuItem("Show", self._on_tray_click, default=True),
-                MenuItem("Quit", self._on_tray_quit),
+                MenuItem("表示", self._on_tray_click, default=True),
+                MenuItem("終了", self._on_tray_quit),
             ),
         )
 
@@ -164,6 +164,18 @@ class TrayApplication:
             t = threading.Thread(target=self.icon.run, daemon=True)
             t.start()
 
+    def _show_startup_toast(self) -> None:
+        """起動時にトースト通知を表示"""
+        if self.icon:
+            try:
+                self.icon.notify(
+                    title="アプリケーション起動",
+                    message="トレイに格納されました。左クリックで表示します。",
+                    # アプリ名
+                )
+            except Exception:
+                pass
+
     def run(self) -> None:
         """アプリケーションを起動"""
         # トレイアイコンを作成
@@ -174,6 +186,9 @@ class TrayApplication:
 
         # 起動時はトレイに隠す
         self.hide_to_tray()
+
+        # 起動時トースト通知を表示（少し遅延させて確実に表示）
+        self.root.after(500, self._show_startup_toast)
 
         # Tkメインループ
         self.root.mainloop()

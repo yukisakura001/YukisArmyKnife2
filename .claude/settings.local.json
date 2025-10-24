@@ -3,7 +3,10 @@
     "allow": [
       "Bash(python main.py:*)",
       "Bash(git rm:*)",
-      "Bash(python -c:*)"
+      "Bash(python -c:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd /c \"dir /b main.dist | findstr /i .exe\")"
     ],
     "deny": [],
     "ask": []

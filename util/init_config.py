@@ -1,3 +1,3 @@
 def init_config():
-    # Initialization code here
+    # 初期化処理をここに記述
     pass

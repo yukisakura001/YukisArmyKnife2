@@ -105,7 +105,7 @@ wheels = [
 
 [[package]]
 name = "pystray"
-version = "0.19.5"
+version = "0.19.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pillow" },
@@ -113,8 +113,9 @@ dependencies = [
     { name = "python-xlib", marker = "sys_platform == 'linux'" },
     { name = "six" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/aa/95/e596a8fe4925b1415181e117535aa3002cf236de06ae76b574d6531b79ea/pystray-0.19.4.tar.gz", hash = "sha256:858784d4e969fe8b5bee6b5476432cf136e7087fdeaf4a1424b13f4f4de87155", size = 41421, upload-time = "2022-06-20T18:23:28.805Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/64/927a4b9024196a4799eba0180e0ca31568426f258a4a5c90f87a97f51d28/pystray-0.19.5-py2.py3-none-any.whl", hash = "sha256:a0c2229d02cf87207297c22d86ffc57c86c227517b038c0d3c59df79295ac617", size = 49068, upload-time = "2023-09-17T13:44:26.872Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/1e/8df97f56162b95026b1254610b82fb37ec32cca94ce000b2afba62fb2533/pystray-0.19.4-py2.py3-none-any.whl", hash = "sha256:aeae1b62d8dbc5a6603fe5c018cddbdfadb0dc332cf7af0997b38ef9f0ceb71c", size = 48812, upload-time = "2022-06-20T18:23:24.429Z" },
 ]
 
 [[package]]
@@ -147,4 +148,4 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pystray", specifier = ">=0.19.5" }]
+requires-dist = [{ name = "pystray", specifier = "==0.19.4" }]
