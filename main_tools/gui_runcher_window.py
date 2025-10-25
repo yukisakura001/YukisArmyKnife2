@@ -1,8 +1,6 @@
 import threading
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import Menu
-from typing import Any
 
 import pystray
 from PIL import Image, ImageDraw
@@ -135,8 +133,10 @@ class TrayApplication:
         current_monitor = None
         try:
             for monitor in get_monitors():
-                if (monitor.x <= mouse_x < monitor.x + monitor.width and
-                    monitor.y <= mouse_y < monitor.y + monitor.height):
+                if (
+                    monitor.x <= mouse_x < monitor.x + monitor.width
+                    and monitor.y <= mouse_y < monitor.y + monitor.height
+                ):
                     current_monitor = monitor
                     break
         except Exception:
@@ -144,8 +144,14 @@ class TrayApplication:
 
         # モニターが見つかった場合はそのモニターの境界で制限
         if current_monitor:
-            x = max(current_monitor.x, min(x, current_monitor.x + current_monitor.width - self.window_width))
-            y = max(current_monitor.y, min(y, current_monitor.y + current_monitor.height - self.window_height))
+            x = max(
+                current_monitor.x,
+                min(x, current_monitor.x + current_monitor.width - self.window_width),
+            )
+            y = max(
+                current_monitor.y,
+                min(y, current_monitor.y + current_monitor.height - self.window_height),
+            )
         else:
             # フォールバック: プライマリディスプレイのサイズを使用
             screen_width = self.root.winfo_screenwidth()
@@ -250,10 +256,12 @@ class TrayApplication:
             win_width = self.root.winfo_width()
             win_height = self.root.winfo_height()
 
-            # マウスがウィンドウ内にあるかチェック
+            # マウスがウィンドウ内にあるかチェック（左右と下側は少し余裕を持たせる）
+            SIDE_TOLERANCE = 70  # 左右の許容範囲（ピクセル）
+            BOTTOM_TOLERANCE = 70  # 下側の許容範囲（ピクセル）
             is_inside = (
-                win_x <= mouse_x <= win_x + win_width
-                and win_y <= mouse_y <= win_y + win_height
+                win_x - SIDE_TOLERANCE <= mouse_x <= win_x + win_width + SIDE_TOLERANCE
+                and win_y <= mouse_y <= win_y + win_height + BOTTOM_TOLERANCE
             )
 
             if is_inside:

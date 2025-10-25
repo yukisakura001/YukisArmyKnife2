@@ -5,12 +5,9 @@
 ファイル、webサイト、ツールのアイコンを取得・管理する
 """
 
-import hashlib
 import os
-import sys
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
 
 from PIL import Image, ImageDraw, ImageTk
 
@@ -37,9 +34,9 @@ def get_default_icon(item_type: str = "file") -> Image.Image:
 
     # タイプ別の洗練された色（パステルトーン）
     colors = {
-        "file": (52, 152, 219, 255),      # ブルー
-        "web": (231, 76, 60, 255),        # レッド
-        "tool": (46, 204, 113, 255),      # グリーン
+        "file": (52, 152, 219, 255),  # ブルー
+        "web": (231, 76, 60, 255),  # レッド
+        "tool": (46, 204, 113, 255),  # グリーン
     }
     color = colors.get(item_type, (149, 165, 166, 255))
 
@@ -48,8 +45,8 @@ def get_default_icon(item_type: str = "file") -> Image.Image:
     draw.ellipse(
         (margin, margin, ICON_SIZE[0] - margin, ICON_SIZE[1] - margin),
         fill=color,
-        outline=(color[0]-20, color[1]-20, color[2]-20, 255),
-        width=2
+        outline=(color[0] - 20, color[1] - 20, color[2] - 20, 255),
+        width=2,
     )
 
     return img
@@ -57,7 +54,7 @@ def get_default_icon(item_type: str = "file") -> Image.Image:
 
 def resolve_shortcut(file_path: str) -> str:
     """
-    ショートカットの場合、リンク先のパスを取得
+    ショートカットの場合、リンク先のパスを取得（Windows専用）
 
     Args:
         file_path: ファイルパス（.lnkファイルの可能性あり）
@@ -69,35 +66,34 @@ def resolve_shortcut(file_path: str) -> str:
         return file_path
 
     try:
-        if sys.platform == "win32":
-            import pythoncom
-            from win32com.shell import shell, shellcon
+        import pythoncom
+        from win32com.shell import shell
 
-            # COMの初期化
-            pythoncom.CoInitialize()
+        # COMの初期化
+        pythoncom.CoInitialize()
 
-            try:
-                # ショートカットオブジェクトを作成
-                shortcut = pythoncom.CoCreateInstance(
-                    shell.CLSID_ShellLink,
-                    None,
-                    pythoncom.CLSCTX_INPROC_SERVER,
-                    shell.IID_IShellLink,
-                )
+        try:
+            # ショートカットオブジェクトを作成
+            shortcut = pythoncom.CoCreateInstance(
+                shell.CLSID_ShellLink,
+                None,
+                pythoncom.CLSCTX_INPROC_SERVER,
+                shell.IID_IShellLink,
+            )
 
-                # IPersistFileインターフェイスを取得
-                persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
+            # IPersistFileインターフェイスを取得
+            persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
 
-                # ショートカットファイルを読み込み
-                persist_file.Load(file_path)
+            # ショートカットファイルを読み込み
+            persist_file.Load(file_path)
 
-                # リンク先のパスを取得
-                target_path, _ = shortcut.GetPath(0)
+            # リンク先のパスを取得
+            target_path, _ = shortcut.GetPath(0)
 
-                if target_path:
-                    return target_path
-            finally:
-                pythoncom.CoUninitialize()
+            if target_path:
+                return target_path
+        finally:
+            pythoncom.CoUninitialize()
     except Exception as e:
         print(f"ショートカット解決エラー: {e}")
 
@@ -106,7 +102,7 @@ def resolve_shortcut(file_path: str) -> str:
 
 def get_file_icon(file_path: str) -> Image.Image:
     """
-    ファイルのアイコンを取得
+    ファイルのアイコンを取得（Windows専用）
 
     Args:
         file_path: ファイルパス
@@ -118,79 +114,75 @@ def get_file_icon(file_path: str) -> Image.Image:
         # ショートカットの場合はリンク先を取得
         resolved_path = resolve_shortcut(file_path)
 
-        # Windowsの場合、SHGetFileInfoを使用してアイコンを取得
-        if sys.platform == "win32":
-            try:
-                import ctypes
-                from ctypes import wintypes
+        # SHGetFileInfoを使用してアイコンを取得
+        try:
+            import ctypes
+            from ctypes import wintypes
 
-                import win32api
-                import win32con
-                import win32gui
-                import win32ui
+            import win32api
+            import win32con
+            import win32gui
+            import win32ui
 
-                # SHGetFileInfo構造体
-                class SHFILEINFO(ctypes.Structure):
-                    _fields_ = [
-                        ("hIcon", wintypes.HANDLE),
-                        ("iIcon", ctypes.c_int),
-                        ("dwAttributes", wintypes.DWORD),
-                        ("szDisplayName", wintypes.WCHAR * 260),
-                        ("szTypeName", wintypes.WCHAR * 80),
-                    ]
+            # SHGetFileInfo構造体
+            class SHFILEINFO(ctypes.Structure):
+                _fields_ = [
+                    ("hIcon", wintypes.HANDLE),
+                    ("iIcon", ctypes.c_int),
+                    ("dwAttributes", wintypes.DWORD),
+                    ("szDisplayName", wintypes.WCHAR * 260),
+                    ("szTypeName", wintypes.WCHAR * 80),
+                ]
 
-                # SHGetFileInfoを使用（拡張子とUSEFILEATTRIBUTESフラグでファイルタイプのアイコンを取得）
-                shell32 = ctypes.windll.shell32
-                shfi = SHFILEINFO()
+            # SHGetFileInfoを使用（拡張子とUSEFILEATTRIBUTESフラグでファイルタイプのアイコンを取得）
+            shell32 = ctypes.windll.shell32
+            shfi = SHFILEINFO()
 
-                # SHGFI_USEFILEATTRIBUTES を使用してファイルタイプのアイコンを取得
-                flags = (
-                    0x000000100  # SHGFI_ICON
-                    | 0x000000000  # SHGFI_LARGEICON
-                    | 0x000000010  # SHGFI_USEFILEATTRIBUTES
+            # SHGFI_USEFILEATTRIBUTES を使用してファイルタイプのアイコンを取得
+            flags = (
+                0x000000100  # SHGFI_ICON
+                | 0x000000000  # SHGFI_LARGEICON
+                | 0x000000010  # SHGFI_USEFILEATTRIBUTES
+            )
+
+            ret = shell32.SHGetFileInfoW(
+                resolved_path,
+                0x80,  # FILE_ATTRIBUTE_NORMAL
+                ctypes.byref(shfi),
+                ctypes.sizeof(shfi),
+                flags,
+            )
+
+            if ret and shfi.hIcon:
+                hicon = shfi.hIcon
+
+                # アイコンサイズを取得
+                ico_x = win32api.GetSystemMetrics(win32con.SM_CXICON)
+                ico_y = win32api.GetSystemMetrics(win32con.SM_CYICON)
+
+                # アイコンをビットマップに変換
+                hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
+                hbmp = win32ui.CreateBitmap()
+                hbmp.CreateCompatibleBitmap(hdc, ico_x, ico_y)
+                hdc = hdc.CreateCompatibleDC()
+
+                hdc.SelectObject(hbmp)
+                hdc.DrawIcon((0, 0), hicon)
+
+                # ビットマップをPIL Imageに変換
+                bmpstr = hbmp.GetBitmapBits(True)
+                img = Image.frombuffer(
+                    "RGBA", (ico_x, ico_y), bmpstr, "raw", "BGRA", 0, 1
                 )
 
-                ret = shell32.SHGetFileInfoW(
-                    resolved_path,
-                    0x80,  # FILE_ATTRIBUTE_NORMAL
-                    ctypes.byref(shfi),
-                    ctypes.sizeof(shfi),
-                    flags,
-                )
+                # クリーンアップ
+                win32gui.DestroyIcon(hicon)
 
-                if ret and shfi.hIcon:
-                    hicon = shfi.hIcon
-
-                    # アイコンサイズを取得
-                    ico_x = win32api.GetSystemMetrics(win32con.SM_CXICON)
-                    ico_y = win32api.GetSystemMetrics(win32con.SM_CYICON)
-
-                    # アイコンをビットマップに変換
-                    hdc = win32ui.CreateDCFromHandle(win32gui.GetDC(0))
-                    hbmp = win32ui.CreateBitmap()
-                    hbmp.CreateCompatibleBitmap(hdc, ico_x, ico_y)
-                    hdc = hdc.CreateCompatibleDC()
-
-                    hdc.SelectObject(hbmp)
-                    hdc.DrawIcon((0, 0), hicon)
-
-                    # ビットマップをPIL Imageに変換
-                    bmpstr = hbmp.GetBitmapBits(True)
-                    img = Image.frombuffer(
-                        "RGBA", (ico_x, ico_y), bmpstr, "raw", "BGRA", 0, 1
-                    )
-
-                    # クリーンアップ
-                    win32gui.DestroyIcon(hicon)
-
-                    return img.resize(ICON_SIZE, Image.Resampling.LANCZOS)
-                else:
-                    return get_default_icon("file")
-            except Exception as e:
-                print(f"Windowsアイコン取得エラー: {e}")
+                return img.resize(ICON_SIZE, Image.Resampling.LANCZOS)
+            else:
                 return get_default_icon("file")
-        else:
-            # 他のOSの場合はデフォルトアイコン
+        except Exception as e:
+            print(f"Windowsアイコン取得エラー: {e}")
             return get_default_icon("file")
     except Exception as e:
         print(f"ファイルアイコン取得エラー: {e}")
@@ -307,11 +299,33 @@ def create_empty_icon() -> ImageTk.PhotoImage:
     color = (173, 181, 189, 255)  # グレー
     dash_length = 3
     for i in range(0, ICON_SIZE[0], dash_length * 2):
-        draw.line((i, 0, min(i + dash_length, ICON_SIZE[0] - 1), 0), fill=color, width=1)
-        draw.line((i, ICON_SIZE[1] - 1, min(i + dash_length, ICON_SIZE[0] - 1), ICON_SIZE[1] - 1), fill=color, width=1)
+        draw.line(
+            (i, 0, min(i + dash_length, ICON_SIZE[0] - 1), 0), fill=color, width=1
+        )
+        draw.line(
+            (
+                i,
+                ICON_SIZE[1] - 1,
+                min(i + dash_length, ICON_SIZE[0] - 1),
+                ICON_SIZE[1] - 1,
+            ),
+            fill=color,
+            width=1,
+        )
     for i in range(0, ICON_SIZE[1], dash_length * 2):
-        draw.line((0, i, 0, min(i + dash_length, ICON_SIZE[1] - 1)), fill=color, width=1)
-        draw.line((ICON_SIZE[0] - 1, i, ICON_SIZE[0] - 1, min(i + dash_length, ICON_SIZE[1] - 1)), fill=color, width=1)
+        draw.line(
+            (0, i, 0, min(i + dash_length, ICON_SIZE[1] - 1)), fill=color, width=1
+        )
+        draw.line(
+            (
+                ICON_SIZE[0] - 1,
+                i,
+                ICON_SIZE[0] - 1,
+                min(i + dash_length, ICON_SIZE[1] - 1),
+            ),
+            fill=color,
+            width=1,
+        )
 
     # プラス記号を描画（より小さく、洗練された色）
     center_x, center_y = ICON_SIZE[0] // 2, ICON_SIZE[1] // 2
@@ -320,15 +334,23 @@ def create_empty_icon() -> ImageTk.PhotoImage:
     plus_color = (108, 117, 125, 255)  # ダークグレー
     # 縦線
     draw.rectangle(
-        (center_x - line_width // 2, center_y - line_len,
-         center_x + line_width // 2, center_y + line_len),
-        fill=plus_color
+        (
+            center_x - line_width // 2,
+            center_y - line_len,
+            center_x + line_width // 2,
+            center_y + line_len,
+        ),
+        fill=plus_color,
     )
     # 横線
     draw.rectangle(
-        (center_x - line_len, center_y - line_width // 2,
-         center_x + line_len, center_y + line_width // 2),
-        fill=plus_color
+        (
+            center_x - line_len,
+            center_y - line_width // 2,
+            center_x + line_len,
+            center_y + line_width // 2,
+        ),
+        fill=plus_color,
     )
 
     return ImageTk.PhotoImage(img)

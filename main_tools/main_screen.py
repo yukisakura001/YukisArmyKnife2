@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 メイン画面モジュール
-
-claunchのようなランチャーアプリケーションのメイン画面
 """
 
 import tkinter as tk
